@@ -1,0 +1,1 @@
+docker build -t local-kubeflow-pipeline-mnist-notebook . -f local.notebook.Dockerfile
