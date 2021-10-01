@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.2, pipelines.kubeflow.org/pipeline_compilation_time: '2021-09-30T12:10:07.977160',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.2, pipelines.kubeflow.org/pipeline_compilation_time: '2021-10-01T18:34:52.112814',
     pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"default": "1", "name": "number_of_epochs",
       "optional": true, "type": "Integer"}, {"default": "120", "name": "train_batch_size",
       "optional": true, "type": "Integer"}, {"default": "120", "name": "test_batch_size",
@@ -48,7 +48,7 @@ spec:
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = download_datasets(**_parsed_args)
-      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2
     outputs:
       artifacts:
       - {name: download-datasets-test_dataset, path: /tmp/outputs/test_dataset/data}
@@ -72,7 +72,7 @@ spec:
           default=argparse.SUPPRESS)\n_parser.add_argument(\"--test-dataset\", dest=\"test_dataset_path\",
           type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n_parsed_args
           = vars(_parser.parse_args())\n\n_outputs = download_datasets(**_parsed_args)\n"],
-          "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest"}}, "name":
+          "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2"}}, "name":
           "Download datasets", "outputs": [{"name": "train_dataset", "type": "Dataset"},
           {"name": "test_dataset", "type": "Dataset"}]}', pipelines.kubeflow.org/component_ref: '{}'}
   - name: evaluate-resnet-model
@@ -103,7 +103,7 @@ spec:
         \ download=False, transform=preprocessing)\n    test_loader = torch.utils.data.DataLoader(dataset=test_dataset_clean,\
         \ batch_size=test_batch_size)\n\n    model = ResNet50(in_channels=1, classes=10)\n\
         \    model.load_state_dict(torch.load(model_path))\n    model.eval()\n   \
-        \ device = torch.device(\"cuda:0\" if torch.cuda.is_available() else \"cpu\"\
+        \ device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\"\
         )\n\n    accuracy = evaluate_accuracy(model, test_loader, test_dataset_clean,\
         \ device)\n\n    metrics = {\n        'metrics': [\n            {\n      \
         \        'name': 'accuracy',\n              'numberValue':  accuracy,\n  \
@@ -118,7 +118,7 @@ spec:
         _parser.add_argument(\"--mlpipeline-metrics\", dest=\"mlpipeline_metrics_path\"\
         , type=_make_parent_dirs_and_return_path, required=True, default=argparse.SUPPRESS)\n\
         _parsed_args = vars(_parser.parse_args())\n\n_outputs = evaluate_resnet_model(**_parsed_args)\n"
-      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2
     inputs:
       parameters:
       - {name: test_batch_size}
@@ -151,7 +151,7 @@ spec:
           = dsets.MNIST(root=test_dataset_path, train=False, download=False, transform=preprocessing)\n    test_loader
           = torch.utils.data.DataLoader(dataset=test_dataset_clean, batch_size=test_batch_size)\n\n    model
           = ResNet50(in_channels=1, classes=10)\n    model.load_state_dict(torch.load(model_path))\n    model.eval()\n    device
-          = torch.device(\"cuda:0\" if torch.cuda.is_available() else \"cpu\")\n\n    accuracy
+          = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\")\n\n    accuracy
           = evaluate_accuracy(model, test_loader, test_dataset_clean, device)\n\n    metrics
           = {\n        ''metrics'': [\n            {\n              ''name'': ''accuracy'',\n              ''numberValue'':  accuracy,\n              ''format'':
           \"PERCENTAGE\",\n            }\n        ]\n    }\n\n    with open(mlpipeline_metrics_path,
@@ -163,7 +163,7 @@ spec:
           dest=\"model_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--mlpipeline-metrics\",
           dest=\"mlpipeline_metrics_path\", type=_make_parent_dirs_and_return_path,
           required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
-          = evaluate_resnet_model(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest"}},
+          = evaluate_resnet_model(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2"}},
           "inputs": [{"name": "test_batch_size", "type": "Integer"}, {"name": "test_dataset",
           "type": "Dataset"}, {"name": "model", "type": "Model"}], "name": "Evaluate
           resnet model", "outputs": [{"name": "mlpipeline_metrics", "type": "Metrics"}]}',
@@ -218,7 +218,7 @@ spec:
         _parsed_args = vars(_parser.parse_args())
 
         _outputs = explore_datasets(**_parsed_args)
-      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2
     inputs:
       artifacts:
       - {name: download-datasets-test_dataset, path: /tmp/inputs/test_dataset/data}
@@ -250,7 +250,7 @@ spec:
           dest=\"test_dataset_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--mlpipeline-ui-metadata\",
           dest=\"mlpipeline_ui_metadata_path\", type=_make_parent_dirs_and_return_path,
           required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
-          = explore_datasets(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest"}},
+          = explore_datasets(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2"}},
           "inputs": [{"name": "train_dataset", "type": "Dataset"}, {"name": "test_dataset",
           "type": "Dataset"}], "name": "Explore datasets", "outputs": [{"name": "mlpipeline_ui_metadata"}]}',
         pipelines.kubeflow.org/component_ref: '{}'}
@@ -311,7 +311,7 @@ spec:
         \    from torchvision.transforms import Normalize\n    from torchvision.transforms\
         \ import Resize\n    from torchvision.transforms import ToTensor\n    from\
         \ kubeflow_pipeline_sample.resnet.resnet_50 import ResNet50\n    from kubeflow_pipeline_sample.training.trainer\
-        \ import train_model\n\n    device = torch.device(\"cuda:0\" if torch.cuda.is_available()\
+        \ import train_model\n\n    device = torch.device(\"cuda\" if torch.cuda.is_available()\
         \ else \"cpu\")\n    model = ResNet50(in_channels=1, classes=10).to(device)\n\
         \n    criterion = nn.CrossEntropyLoss()\n    optimizer = torch.optim.SGD(model.parameters(),\
         \ lr = learning_rate)\n\n    IMAGE_SIZE = 64\n\n    preprocessing = Compose([\n\
@@ -332,7 +332,7 @@ spec:
         _parser.add_argument(\"--model\", dest=\"model_path\", type=_make_parent_dirs_and_return_path,\
         \ required=True, default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\
         \n_outputs = train_resnet_model(**_parsed_args)\n"
-      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2
     inputs:
       parameters:
       - {name: learning_rate}
@@ -361,7 +361,7 @@ spec:
           torchvision.transforms import Normalize\n    from torchvision.transforms
           import Resize\n    from torchvision.transforms import ToTensor\n    from
           kubeflow_pipeline_sample.resnet.resnet_50 import ResNet50\n    from kubeflow_pipeline_sample.training.trainer
-          import train_model\n\n    device = torch.device(\"cuda:0\" if torch.cuda.is_available()
+          import train_model\n\n    device = torch.device(\"cuda\" if torch.cuda.is_available()
           else \"cpu\")\n    model = ResNet50(in_channels=1, classes=10).to(device)\n\n    criterion
           = nn.CrossEntropyLoss()\n    optimizer = torch.optim.SGD(model.parameters(),
           lr = learning_rate)\n\n    IMAGE_SIZE = 64\n\n    preprocessing = Compose([\n        Resize((IMAGE_SIZE,
@@ -376,7 +376,7 @@ spec:
           dest=\"train_dataset_path\", type=str, required=True, default=argparse.SUPPRESS)\n_parser.add_argument(\"--model\",
           dest=\"model_path\", type=_make_parent_dirs_and_return_path, required=True,
           default=argparse.SUPPRESS)\n_parsed_args = vars(_parser.parse_args())\n\n_outputs
-          = train_resnet_model(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:latest"}},
+          = train_resnet_model(**_parsed_args)\n"], "image": "public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v2"}},
           "inputs": [{"name": "number_of_epochs", "type": "Integer"}, {"name": "train_batch_size",
           "type": "Integer"}, {"name": "learning_rate", "type": "Float"}, {"name":
           "train_dataset", "type": "Dataset"}], "name": "Train resnet model", "outputs":
