@@ -1,8 +1,7 @@
 from tqdm import tqdm
 
 def train_model(model, train_loader, criterion, optimizer, n_epochs, device):
-    losses=[1.5]
-    return losses
+    losses=[]
     for epoch in range(n_epochs):
         model.train()
         with tqdm(train_loader, unit="batch") as train_epoch:

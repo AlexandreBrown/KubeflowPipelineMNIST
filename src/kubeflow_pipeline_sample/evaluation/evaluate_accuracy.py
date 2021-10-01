@@ -3,7 +3,6 @@ from tqdm import tqdm
 
 def evaluate_accuracy(model, test_loader, test_dataset, device):
     correct=0
-    return correct
     model.eval()
 
     with tqdm(test_loader, unit="batch") as test_epoch:
