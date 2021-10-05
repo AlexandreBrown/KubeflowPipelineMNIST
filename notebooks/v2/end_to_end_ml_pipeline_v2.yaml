@@ -1,0 +1,526 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: end-to-end-pipeline-v2-
+  annotations:
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+    pipelines.kubeflow.org/pipeline_compilation_time: '2021-10-05T18:36:43.651672'
+    pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"default": "1", "name": "number_of_epochs",
+      "optional": true, "type": "Integer"}, {"default": "120", "name": "train_batch_size",
+      "optional": true, "type": "Integer"}, {"default": "120", "name": "test_batch_size",
+      "optional": true, "type": "Integer"}, {"default": "0.1", "name": "learning_rate",
+      "optional": true, "type": "Float"}, {"default": "", "name": "pipeline-root"},
+      {"default": "pipeline/end-to-end-pipeline-v2", "name": "pipeline-name"}], "name":
+      "end-to-end-pipeline-v2"}'
+    pipelines.kubeflow.org/v2_pipeline: "true"
+  labels:
+    pipelines.kubeflow.org/v2_pipeline: "true"
+    pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+spec:
+  entrypoint: end-to-end-pipeline-v2
+  templates:
+  - name: download-datasets
+    container:
+      args:
+      - sh
+      - -c
+      - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
+        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.2'
+        || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
+        'kfp==1.8.2' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - |2+
+
+        from kfp.v2.dsl import *
+        from typing import *
+
+        def download_datasets(
+            train_dataset_output: Output[Dataset],
+            test_dataset_output: Output[Dataset]
+        ):
+            import torchvision.datasets as dsets
+            import os
+
+            os.makedirs(train_dataset_output.path)
+            dsets.MNIST(root=train_dataset_output.path, train=True, download=True)
+
+            os.makedirs(test_dataset_output.path)
+            dsets.MNIST(root=test_dataset_output.path, train=False, download=True)
+
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - download_datasets
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, download-datasets, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {}, "inputArtifacts":
+          {}, "outputParameters": {}, "outputArtifacts": {"test_dataset_output": {"schemaTitle":
+          "system.Dataset", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/test_dataset_output/data"}, "train_dataset_output": {"schemaTitle":
+          "system.Dataset", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/train_dataset_output/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+    outputs:
+      artifacts:
+      - {name: download-datasets-test_dataset_output, path: /tmp/outputs/test_dataset_output/data}
+      - {name: download-datasets-train_dataset_output, path: /tmp/outputs/train_dataset_output/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.2
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+  - name: end-to-end-pipeline-v2
+    inputs:
+      parameters:
+      - {name: learning_rate}
+      - {name: number_of_epochs}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      - {name: test_batch_size}
+      - {name: train_batch_size}
+    dag:
+      tasks:
+      - name: download-datasets
+        template: download-datasets
+        arguments:
+          parameters:
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+      - name: evaluate-resnet-model
+        template: evaluate-resnet-model
+        dependencies: [download-datasets, train-resnet-model]
+        arguments:
+          parameters:
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+          - {name: test_batch_size, value: '{{inputs.parameters.test_batch_size}}'}
+          artifacts:
+          - {name: download-datasets-test_dataset_output, from: '{{tasks.download-datasets.outputs.artifacts.download-datasets-test_dataset_output}}'}
+          - {name: train-resnet-model-model_output, from: '{{tasks.train-resnet-model.outputs.artifacts.train-resnet-model-model_output}}'}
+      - name: explore-datasets
+        template: explore-datasets
+        dependencies: [download-datasets]
+        arguments:
+          parameters:
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+          artifacts:
+          - {name: download-datasets-test_dataset_output, from: '{{tasks.download-datasets.outputs.artifacts.download-datasets-test_dataset_output}}'}
+          - {name: download-datasets-train_dataset_output, from: '{{tasks.download-datasets.outputs.artifacts.download-datasets-train_dataset_output}}'}
+      - name: train-resnet-model
+        template: train-resnet-model
+        dependencies: [download-datasets]
+        arguments:
+          parameters:
+          - {name: learning_rate, value: '{{inputs.parameters.learning_rate}}'}
+          - {name: number_of_epochs, value: '{{inputs.parameters.number_of_epochs}}'}
+          - {name: pipeline-name, value: '{{inputs.parameters.pipeline-name}}'}
+          - {name: pipeline-root, value: '{{inputs.parameters.pipeline-root}}'}
+          - {name: train_batch_size, value: '{{inputs.parameters.train_batch_size}}'}
+          artifacts:
+          - {name: download-datasets-train_dataset_output, from: '{{tasks.download-datasets.outputs.artifacts.download-datasets-train_dataset_output}}'}
+  - name: evaluate-resnet-model
+    container:
+      args:
+      - sh
+      - -c
+      - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
+        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.2'
+        || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
+        'kfp==1.8.2' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - |2+
+
+        from kfp.v2.dsl import *
+        from typing import *
+
+        def evaluate_resnet_model(
+            test_batch_size: int,
+            test_dataset_input: Input[Dataset],
+            model_input: Input[Model],
+            metrics: Output[Metrics]
+        ):
+            import torch
+            import torchvision.datasets as dsets
+            from kubeflow_pipeline_sample.resnet.resnet_50 import ResNet50
+            from kubeflow_pipeline_sample.evaluation.evaluate_accuracy import evaluate_accuracy
+            from torchvision.transforms import Compose
+            from torchvision.transforms import Normalize
+            from torchvision.transforms import Resize
+            from torchvision.transforms import ToTensor
+
+            IMAGE_SIZE = 64
+
+            preprocessing = Compose([
+                Resize((IMAGE_SIZE, IMAGE_SIZE)),
+                ToTensor(),
+                Normalize(mean=(0.5), std=(0.5))
+            ])
+            test_dataset_clean = dsets.MNIST(root=test_dataset_input.path, train=False, download=False, transform=preprocessing)
+            test_loader = torch.utils.data.DataLoader(dataset=test_dataset_clean, batch_size=test_batch_size)
+
+            model = ResNet50(in_channels=1, classes=10)
+            model.load_state_dict(torch.load(model_input.path))
+            model.eval()
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+            accuracy = evaluate_accuracy(model, test_loader, test_dataset_clean, device)
+
+            metrics.log_metric("accuracy", accuracy)
+
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - evaluate_resnet_model
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, evaluate-resnet-model, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, 'test_batch_size={{inputs.parameters.test_batch_size}}',
+        --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"test_batch_size":
+          {"type": "INT"}}, "inputArtifacts": {"model_input": {"metadataPath": "/tmp/inputs/model_input/data",
+          "schemaTitle": "system.Model", "instanceSchema": "", "schemaVersion": "0.0.1"},
+          "test_dataset_input": {"metadataPath": "/tmp/inputs/test_dataset_input/data",
+          "schemaTitle": "system.Dataset", "instanceSchema": "", "schemaVersion":
+          "0.0.1"}}, "outputParameters": {}, "outputArtifacts": {"metrics": {"schemaTitle":
+          "system.Metrics", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/metrics/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      - {name: test_batch_size}
+      artifacts:
+      - {name: train-resnet-model-model_output, path: /tmp/inputs/model_input/data}
+      - {name: download-datasets-test_dataset_output, path: /tmp/inputs/test_dataset_input/data}
+    outputs:
+      artifacts:
+      - {name: evaluate-resnet-model-metrics, path: /tmp/outputs/metrics/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{}'
+        pipelines.kubeflow.org/arguments.parameters: '{"test_batch_size": "{{inputs.parameters.test_batch_size}}"}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.2
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+  - name: explore-datasets
+    container:
+      args:
+      - sh
+      - -c
+      - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
+        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.2'
+        || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
+        'kfp==1.8.2' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - |2+
+
+        from kfp.v2.dsl import *
+        from typing import *
+
+        def explore_datasets(
+            train_dataset_input: Input[Dataset],
+            test_dataset_input: Input[Dataset],
+            metrics: Output[Metrics]
+        ):
+            import torchvision.datasets as dsets
+
+            train = dsets.MNIST(root=train_dataset_input.path, train=True, download=False)
+            test = dsets.MNIST(root=test_dataset_input.path, train=False, download=False)
+
+            metrics.log_metric("training samples", len(train))
+            metrics.log_metric("test samples", len(test))
+            metrics.log_metric("gsd", 5.5)
+
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - explore_datasets
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, explore-datasets, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {}, "inputArtifacts":
+          {"test_dataset_input": {"metadataPath": "/tmp/inputs/test_dataset_input/data",
+          "schemaTitle": "system.Dataset", "instanceSchema": "", "schemaVersion":
+          "0.0.1"}, "train_dataset_input": {"metadataPath": "/tmp/inputs/train_dataset_input/data",
+          "schemaTitle": "system.Dataset", "instanceSchema": "", "schemaVersion":
+          "0.0.1"}}, "outputParameters": {}, "outputArtifacts": {"metrics": {"schemaTitle":
+          "system.Metrics", "instanceSchema": "", "schemaVersion": "0.0.1", "metadataPath":
+          "/tmp/outputs/metrics/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      artifacts:
+      - {name: download-datasets-test_dataset_output, path: /tmp/inputs/test_dataset_input/data}
+      - {name: download-datasets-train_dataset_output, path: /tmp/inputs/train_dataset_input/data}
+    outputs:
+      artifacts:
+      - {name: explore-datasets-metrics, path: /tmp/outputs/metrics/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.2
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+  - name: train-resnet-model
+    container:
+      args:
+      - sh
+      - -c
+      - (python3 -m ensurepip || python3 -m ensurepip --user) && (PIP_DISABLE_PIP_VERSION_CHECK=1
+        python3 -m pip install --quiet                 --no-warn-script-location 'kfp==1.8.2'
+        || PIP_DISABLE_PIP_VERSION_CHECK=1 python3 -m pip install --quiet                 --no-warn-script-location
+        'kfp==1.8.2' --user) && "$0" "$@"
+      - sh
+      - -ec
+      - |
+        program_path=$(mktemp -d)
+        printf "%s" "$0" > "$program_path/ephemeral_component.py"
+        python3 -m kfp.v2.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+      - "\nfrom kfp.v2.dsl import *\nfrom typing import *\n\ndef train_resnet_model(\n\
+        \    number_of_epochs: int,\n    train_batch_size: int,\n    learning_rate:\
+        \ float,\n    train_dataset_input: Input[Dataset],\n    model_output: Output[Model],\n\
+        \    metrics: Output[Metrics]\n):\n    import torch\n    import torch.nn as\
+        \ nn\n    import torchvision.datasets as dsets\n    from torchvision.transforms\
+        \ import Compose\n    from torchvision.transforms import Normalize\n    from\
+        \ torchvision.transforms import Resize\n    from torchvision.transforms import\
+        \ ToTensor\n    from kubeflow_pipeline_sample.resnet.resnet_50 import ResNet50\n\
+        \    from kubeflow_pipeline_sample.training.trainer import train_model\n\n\
+        \    device = torch.device(\"cuda\" if torch.cuda.is_available() else \"cpu\"\
+        )\n    model = ResNet50(in_channels=1, classes=10).to(device)\n\n    criterion\
+        \ = nn.CrossEntropyLoss()\n    optimizer = torch.optim.SGD(model.parameters(),\
+        \ lr=learning_rate)\n\n    IMAGE_SIZE = 64\n\n    preprocessing = Compose([\n\
+        \        Resize((IMAGE_SIZE, IMAGE_SIZE)), \n        ToTensor(),\n       \
+        \ Normalize(mean=(0.5), std=(0.5))\n    ])\n    train_dataset_clean = dsets.MNIST(root=train_dataset_input.path,\
+        \ train=True, download=False, transform=preprocessing)\n    train_loader =\
+        \ torch.utils.data.DataLoader(dataset=train_dataset_clean, batch_size=train_batch_size)\n\
+        \n    losses = train_model(\n        model=model,\n        train_loader=train_loader,\n\
+        \        criterion=criterion,\n        optimizer=optimizer,\n        n_epochs=number_of_epochs,\n\
+        \        device=device\n    )\n    model_framework: str = f\"pytorch:{torch.__version__}\"\
+        \n    model_output.framework = model_framework\n\n    torch.save(model.state_dict(),\
+        \ model_output.path)\n\n"
+      - --executor_input
+      - '{{$}}'
+      - --function_to_execute
+      - train_resnet_model
+      command: [/kfp-launcher/launch, --mlmd_server_address, $(METADATA_GRPC_SERVICE_HOST),
+        --mlmd_server_port, $(METADATA_GRPC_SERVICE_PORT), --runtime_info_json, $(KFP_V2_RUNTIME_INFO),
+        --container_image, $(KFP_V2_IMAGE), --task_name, train-resnet-model, --pipeline_name,
+        '{{inputs.parameters.pipeline-name}}', --run_id, $(KFP_RUN_ID), --run_resource,
+        workflows.argoproj.io/$(WORKFLOW_ID), --namespace, $(KFP_NAMESPACE), --pod_name,
+        $(KFP_POD_NAME), --pod_uid, $(KFP_POD_UID), --pipeline_root, '{{inputs.parameters.pipeline-root}}',
+        --enable_caching, $(ENABLE_CACHING), --, 'learning_rate={{inputs.parameters.learning_rate}}',
+        'number_of_epochs={{inputs.parameters.number_of_epochs}}', 'train_batch_size={{inputs.parameters.train_batch_size}}',
+        --]
+      env:
+      - name: KFP_POD_NAME
+        valueFrom:
+          fieldRef: {fieldPath: metadata.name}
+      - name: KFP_POD_UID
+        valueFrom:
+          fieldRef: {fieldPath: metadata.uid}
+      - name: KFP_NAMESPACE
+        valueFrom:
+          fieldRef: {fieldPath: metadata.namespace}
+      - name: WORKFLOW_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''workflows.argoproj.io/workflow'']'}
+      - name: KFP_RUN_ID
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipeline/runid'']'}
+      - name: ENABLE_CACHING
+        valueFrom:
+          fieldRef: {fieldPath: 'metadata.labels[''pipelines.kubeflow.org/enable_caching'']'}
+      - {name: KFP_V2_IMAGE, value: 'public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3'}
+      - {name: KFP_V2_RUNTIME_INFO, value: '{"inputParameters": {"learning_rate":
+          {"type": "DOUBLE"}, "number_of_epochs": {"type": "INT"}, "train_batch_size":
+          {"type": "INT"}}, "inputArtifacts": {"train_dataset_input": {"metadataPath":
+          "/tmp/inputs/train_dataset_input/data", "schemaTitle": "system.Dataset",
+          "instanceSchema": "", "schemaVersion": "0.0.1"}}, "outputParameters": {},
+          "outputArtifacts": {"metrics": {"schemaTitle": "system.Metrics", "instanceSchema":
+          "", "schemaVersion": "0.0.1", "metadataPath": "/tmp/outputs/metrics/data"},
+          "model_output": {"schemaTitle": "system.Model", "instanceSchema": "", "schemaVersion":
+          "0.0.1", "metadataPath": "/tmp/outputs/model_output/data"}}}'}
+      envFrom:
+      - configMapRef: {name: metadata-grpc-configmap, optional: true}
+      image: public.ecr.aws/h3o0w0k1/kubeflow-pipeline-mnist:v3
+      volumeMounts:
+      - {mountPath: /kfp-launcher, name: kfp-launcher}
+    inputs:
+      parameters:
+      - {name: learning_rate}
+      - {name: number_of_epochs}
+      - {name: pipeline-name}
+      - {name: pipeline-root}
+      - {name: train_batch_size}
+      artifacts:
+      - {name: download-datasets-train_dataset_output, path: /tmp/inputs/train_dataset_input/data}
+    outputs:
+      artifacts:
+      - {name: train-resnet-model-metrics, path: /tmp/outputs/metrics/data}
+      - {name: train-resnet-model-model_output, path: /tmp/outputs/model_output/data}
+    metadata:
+      annotations:
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/component_ref: '{}'
+        pipelines.kubeflow.org/arguments.parameters: '{"learning_rate": "{{inputs.parameters.learning_rate}}",
+          "number_of_epochs": "{{inputs.parameters.number_of_epochs}}", "train_batch_size":
+          "{{inputs.parameters.train_batch_size}}"}'
+      labels:
+        pipelines.kubeflow.org/kfp_sdk_version: 1.8.2
+        pipelines.kubeflow.org/pipeline-sdk-type: kfp
+        pipelines.kubeflow.org/v2_component: "true"
+        pipelines.kubeflow.org/enable_caching: "true"
+    initContainers:
+    - command: [launcher, --copy, /kfp-launcher/launch]
+      image: gcr.io/ml-pipeline/kfp-launcher:1.8.2
+      name: kfp-launcher
+      mirrorVolumeMounts: true
+    volumes:
+    - {name: kfp-launcher}
+  arguments:
+    parameters:
+    - {name: number_of_epochs, value: '1'}
+    - {name: train_batch_size, value: '120'}
+    - {name: test_batch_size, value: '120'}
+    - {name: learning_rate, value: '0.1'}
+    - {name: pipeline-root, value: ''}
+    - {name: pipeline-name, value: pipeline/end-to-end-pipeline-v2}
+  serviceAccountName: pipeline-runner
