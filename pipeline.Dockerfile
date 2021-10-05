@@ -1,4 +1,5 @@
 FROM gpuci/miniconda-cuda:11.1-base-ubuntu20.04
+ENV PYTHONPATH="${PYTHONPATH}:/tmp/"
 
 WORKDIR /
 
