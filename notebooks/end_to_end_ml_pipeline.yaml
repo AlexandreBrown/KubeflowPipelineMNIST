@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: pipeline-
-  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.2, pipelines.kubeflow.org/pipeline_compilation_time: '2021-10-01T18:34:52.112814',
+  annotations: {pipelines.kubeflow.org/kfp_sdk_version: 1.8.2, pipelines.kubeflow.org/pipeline_compilation_time: '2021-10-05T14:06:32.324573',
     pipelines.kubeflow.org/pipeline_spec: '{"inputs": [{"default": "1", "name": "number_of_epochs",
       "optional": true, "type": "Integer"}, {"default": "120", "name": "train_batch_size",
       "optional": true, "type": "Integer"}, {"default": "120", "name": "test_batch_size",
